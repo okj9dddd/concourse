@@ -497,6 +497,8 @@ var _ = Describe("Job", func() {
 
 				startedBuild, err = job.CreateBuild()
 				Expect(err).NotTo(HaveOccurred())
+				_, err = startedBuild.Schedule()
+				Expect(err).NotTo(HaveOccurred())
 				_, err = startedBuild.Start("", atc.Plan{})
 				Expect(err).NotTo(HaveOccurred())
 
