@@ -448,48 +448,6 @@ func (j *job) EnsurePendingBuildExists() error {
 	return nil
 }
 
-func (j *job) GetPendingBuilds() ([]Build, error) {
-	builds := []Build{}
-
-	row := jobsQuery.Where(sq.Eq{
-		"j.name":        j.name,
-		"j.active":      true,
-		"j.pipeline_id": j.pipelineID,
-	}).RunWith(j.conn).QueryRow()
-
-	job := &job{conn: j.conn, lockFactory: j.lockFactory}
-	err := scanJob(job, row)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := buildsQuery.
-		Where(sq.Eq{
-			"b.job_id": j.id,
-			"b.status": BuildStatusPending,
-		}).
-		OrderBy("b.id ASC").
-		RunWith(j.conn).
-		Query()
-	if err != nil {
-		return nil, err
-	}
-
-	defer Close(rows)
-
-	for rows.Next() {
-		build := &build{conn: j.conn, lockFactory: j.lockFactory}
-		err = scanBuild(build, rows, j.conn.EncryptionStrategy())
-		if err != nil {
-			return nil, err
-		}
-
-		builds = append(builds, build)
-	}
-
-	return builds, nil
-}
-
 func (j *job) CreateBuild() (Build, error) {
 	tx, err := j.conn.Begin()
 	if err != nil {
@@ -527,6 +485,37 @@ func (j *job) CreateBuild() (Build, error) {
 	}
 
 	return build, nil
+}
+
+func (j *job) GetPendingBuilds() ([]Build, error) {
+	builds := []Build{}
+
+	rows, err := buildsQuery.
+		Where(sq.Eq{
+			"b.status": BuildStatusPending,
+			"j.active": true,
+			"b.job_id": j.id,
+		}).
+		OrderBy("b.id").
+		RunWith(j.conn).
+		Query()
+	if err != nil {
+		return nil, err
+	}
+
+	defer Close(rows)
+
+	for rows.Next() {
+		build := &build{conn: j.conn, lockFactory: j.lockFactory}
+		err = scanBuild(build, rows, j.conn.EncryptionStrategy())
+		if err != nil {
+			return nil, err
+		}
+
+		builds = append(builds, build)
+	}
+
+	return builds, nil
 }
 
 func (j *job) ClearTaskCache(stepName string, cachePath string) (int64, error) {

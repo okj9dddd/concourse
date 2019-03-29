@@ -1111,16 +1111,8 @@ var _ = Describe("Job", func() {
 		It("becomes the next pending build for job", func() {
 			nextPendings, err := job.GetPendingBuilds()
 			Expect(err).NotTo(HaveOccurred())
-			//time.Sleep(10 * time.Hour)
 			Expect(nextPendings).NotTo(BeEmpty())
 			Expect(nextPendings[0].ID()).To(Equal(build1DB.ID()))
-		})
-
-		It("is in the list of pending builds", func() {
-			nextPendingBuilds, err := pipeline.GetAllPendingBuilds()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(nextPendingBuilds["some-job"]).To(HaveLen(1))
-			Expect(nextPendingBuilds["some-job"]).To(Equal([]db.Build{build1DB}))
 		})
 
 		Context("and another build for a different pipeline is created with the same job name", func() {
@@ -1140,13 +1132,6 @@ var _ = Describe("Job", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(nextPendingBuilds).To(Equal([]db.Build{build1DB}))
 			})
-
-			It("does not change pending builds", func() {
-				nextPendingBuilds, err := pipeline.GetAllPendingBuilds()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(nextPendingBuilds["some-job"]).To(HaveLen(1))
-				Expect(nextPendingBuilds["some-job"]).To(Equal([]db.Build{build1DB}))
-			})
 		})
 
 		Context("when scheduled", func() {
@@ -1163,13 +1148,6 @@ var _ = Describe("Job", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(nextPendingBuilds).NotTo(BeEmpty())
 				Expect(nextPendingBuilds[0].ID()).To(Equal(build1DB.ID()))
-			})
-
-			It("remains in the list of pending builds", func() {
-				nextPendingBuilds, err := pipeline.GetAllPendingBuilds()
-				Expect(err).NotTo(HaveOccurred())
-				Expect(nextPendingBuilds["some-job"]).To(HaveLen(1))
-				Expect(nextPendingBuilds["some-job"][0].ID()).To(Equal(build1DB.ID()))
 			})
 		})
 
@@ -1233,13 +1211,6 @@ var _ = Describe("Job", func() {
 					Expect(nextPendingBuilds).To(HaveLen(2))
 					Expect(nextPendingBuilds[0].ID()).To(Equal(build1DB.ID()))
 					Expect(nextPendingBuilds[1].ID()).To(Equal(build2DB.ID()))
-				})
-
-				It("remains in the list of pending builds", func() {
-					nextPendingBuilds, err := pipeline.GetAllPendingBuilds()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(nextPendingBuilds["some-job"]).To(HaveLen(2))
-					Expect(nextPendingBuilds["some-job"]).To(ConsistOf(build1DB, build2DB))
 				})
 			})
 		})
@@ -1395,4 +1366,30 @@ var _ = Describe("Job", func() {
 			})
 		})
 	})
+
+	Describe("GetPendingBuilds", func() {
+		Context("when a build is created", func() {
+			var build db.Build
+
+			BeforeEach(func() {
+				var err error
+				build, err = job.CreateBuild()
+				Expect(err).ToNot(HaveOccurred())
+
+				finishedBuild, err := job.CreateBuild()
+				Expect(err).ToNot(HaveOccurred())
+
+				err = finishedBuild.Finish(db.BuildStatusSucceeded)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("returns the build", func() {
+				pendingBuildsForJob, err := job.GetPendingBuilds()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(pendingBuildsForJob).To(HaveLen(1))
+				Expect(pendingBuildsForJob[0].ID()).To(Equal(build.ID()))
+			})
+		})
+	})
+
 })

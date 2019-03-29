@@ -79,37 +79,24 @@ var _ = Describe("Runner", func() {
 		noop = false
 
 		someVersions = &algorithm.VersionsDB{
-			BuildOutputs: []algorithm.BuildOutput{
-				{
-					ResourceVersion: algorithm.ResourceVersion{
-						VersionID:  1,
-						ResourceID: 2,
-					},
-					BuildID: 3,
-					JobID:   4,
-				},
-				{
-					ResourceVersion: algorithm.ResourceVersion{
-						VersionID:  1,
-						ResourceID: 2,
-					},
-					BuildID: 7,
-					JobID:   8,
-				},
-			},
+			JobIDs:      map[string]int{"some-job": 4, "some-other-job": 8},
+			ResourceIDs: map[string]int{"some-resource": 2, "some-dependant-resource": 2},
 		}
 
 		fakePipeline.LoadVersionsDBReturns(someVersions, nil)
 
 		fakeJob1 = new(dbfakes.FakeJob)
 		fakeJob1.NameReturns("some-job")
+		fakeJob1.IDReturns(4)
 		fakeJob2 = new(dbfakes.FakeJob)
 		fakeJob2.NameReturns("some-other-job")
+		fakeJob2.IDReturns(8)
 
 		fakeResource1 = new(dbfakes.FakeResource)
 		fakeResource1.NameReturns("some-resource")
 		fakeResource1.TypeReturns("git")
 		fakeResource1.SourceReturns(atc.Source{"uri": "git://some-resource"})
+		fakeResource1.IDReturns(2)
 		fakeResource2 = new(dbfakes.FakeResource)
 		fakeResource2.NameReturns("some-dependant-resource")
 		fakeResource2.TypeReturns("git")
@@ -166,6 +153,11 @@ var _ = Describe("Runner", func() {
 
 			Expect(scheduler.ScheduleCallCount()).To(BeZero())
 		})
+	})
+
+	It("grabs the jobs and loads the versions db for the pipeline", func() {
+		Expect(fakePipeline.JobsCallCount()).To(Equal(1))
+		Expect(fakePipeline.LoadVersionsDBCallCount()).To(Equal(1))
 	})
 
 	It("schedules pending builds", func() {

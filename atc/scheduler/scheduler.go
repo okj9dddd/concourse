@@ -19,41 +19,31 @@ type Scheduler struct {
 func (s *Scheduler) Schedule(
 	logger lager.Logger,
 	versions *algorithm.VersionsDB,
-	jobs []db.Job,
+	job db.Job,
 	resources db.Resources,
 	resourceTypes atc.VersionedResourceTypes,
 ) (map[string]time.Duration, error) {
 	jobSchedulingTime := map[string]time.Duration{}
 
-	for _, job := range jobs {
-		jStart := time.Now()
-		err := s.ensurePendingBuildExists(logger, versions, job, resources)
-		jobSchedulingTime[job.Name()] = time.Since(jStart)
+	jStart := time.Now()
+	err := s.ensurePendingBuildExists(logger, versions, job, resources)
+	jobSchedulingTime[job.Name()] = time.Since(jStart)
 
-		if err != nil {
-			return jobSchedulingTime, err
-		}
-	}
-
-	nextPendingBuilds, err := s.Pipeline.GetAllPendingBuilds()
 	if err != nil {
-		logger.Error("failed-to-get-all-next-pending-builds", err)
 		return jobSchedulingTime, err
 	}
 
-	for _, job := range jobs {
-		jStart := time.Now()
-		nextPendingBuildsForJob, ok := nextPendingBuilds[job.Name()]
-		if !ok {
-			continue
-		}
+	nextPendingBuilds, err := job.GetPendingBuilds()
+	if err != nil {
+		logger.Error("failed-to-get-next-pending-builds", err)
+		return jobSchedulingTime, err
+	}
 
-		err := s.BuildStarter.TryStartPendingBuildsForJob(logger, job, resources, resourceTypes, nextPendingBuildsForJob)
-		jobSchedulingTime[job.Name()] = jobSchedulingTime[job.Name()] + time.Since(jStart)
+	err = s.BuildStarter.TryStartPendingBuildsForJob(logger, job, resources, resourceTypes, nextPendingBuilds)
+	jobSchedulingTime[job.Name()] = jobSchedulingTime[job.Name()] + time.Since(jStart)
 
-		if err != nil {
-			return jobSchedulingTime, err
-		}
+	if err != nil {
+		return jobSchedulingTime, err
 	}
 
 	return jobSchedulingTime, nil

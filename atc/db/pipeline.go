@@ -54,7 +54,6 @@ type Pipeline interface {
 	CreateOneOffBuild() (Build, error)
 	CreateStartedBuild(plan atc.Plan) (Build, error)
 
-	GetAllPendingBuilds() (map[string][]Build, error)
 	BuildsWithTime(page Page) ([]Build, Pagination, error)
 
 	DeleteBuildEventsByBuildIDs(buildIDs []int) error
@@ -283,37 +282,6 @@ func (p *pipeline) CreateJobBuild(jobName string) (Build, error) {
 	}
 
 	return build, nil
-}
-
-func (p *pipeline) GetAllPendingBuilds() (map[string][]Build, error) {
-	builds := map[string][]Build{}
-
-	rows, err := buildsQuery.
-		Where(sq.Eq{
-			"b.status":      BuildStatusPending,
-			"j.active":      true,
-			"b.pipeline_id": p.id,
-		}).
-		OrderBy("b.id").
-		RunWith(p.conn).
-		Query()
-	if err != nil {
-		return nil, err
-	}
-
-	defer Close(rows)
-
-	for rows.Next() {
-		build := &build{conn: p.conn, lockFactory: p.lockFactory}
-		err = scanBuild(build, rows, p.conn.EncryptionStrategy())
-		if err != nil {
-			return nil, err
-		}
-
-		builds[build.JobName()] = append(builds[build.JobName()], build)
-	}
-
-	return builds, nil
 }
 
 // ResourceVersion is given a resource config version id and returns the
